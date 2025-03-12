@@ -4,5 +4,5 @@
   "domain": "rad_hw_afval",
   "documentation": "https://github.com/keesmod/ha-rad-hw",
   "issue_tracker": "https://github.com/keesmod/ha-rad-hw/issues",
-  "homeassistant": "2023.8.0"
+  "homeassistant": "2025.3.2"
 } 
