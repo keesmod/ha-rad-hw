@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RAD Hoeksche Waard Afval",
+        "description": "Configureer RAD Hoeksche Waard afvalkalender",
+        "data": {
+          "postal_code": "Postcode",
+          "street_number": "Huisnummer",
+          "date_format": "Datumformaat",
+          "resources": "Afvaltypes"
+        }
+      }
+    },
+    "error": {
+      "invalid_postal_code": "Ongeldig postcode formaat. Gebruik Nederlands formaat (bijv. 1234AB)",
+      "invalid_street_number": "Ongeldig huisnummer. Voer een nummer in"
+    },
+    "abort": {
+      "already_configured": "Dit adres is al geconfigureerd"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "RAD Hoeksche Waard Afval Opties",
+        "description": "Configureer afvalophaal opties",
+        "data": {
+          "date_format": "Datumformaat",
+          "resources": "Afvaltypes"
+        }
+      }
+    }
+  }
+} 

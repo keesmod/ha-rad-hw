@@ -1,0 +1,8 @@
+{
+  "name": "RAD Hoeksche Waard Afval",
+  "render_readme": true,
+  "domain": "rad_hw_afval",
+  "documentation": "https://github.com/pboudewijns/ha-rad-hw",
+  "issue_tracker": "https://github.com/pboudewijns/ha-rad-hw/issues",
+  "homeassistant": "2023.8.0"
+} 
