@@ -39,6 +39,7 @@ The integration can be configured via the Home Assistant UI. You will need to pr
 - Each sensor shows the number of days until the next collection
 - The next collection date is available as an attribute
 - If a future collection date isn't available, the most recent past date will be shown with an `is_past_date` attribute set to `true`
+- Compatible with Home Assistant 2025.3.2 and likely with earlier versions
 
 ## Technical Details
 
