@@ -130,25 +130,6 @@ logger:
 - **Missing waste types**: Some waste types might not have future collection dates in the API. The integration will show the most recent past date with the `is_past_date` attribute set to `true`.
 - **Different dates than shown in the RAD app**: Verify your postal code and street number are correct. If the dates still differ, please report it as an issue.
 
-## Testing
-
-The integration includes a standalone test script:
-
-- `standalone_test.py` - Tests the API client with live data
-
-To run the test:
-
-```bash
-cd custom_components/rad_hw_afval
-python3 standalone_test.py YOUR_POSTAL_CODE YOUR_STREET_NUMBER
-```
-
-Add the `--include-past` flag to see past collection dates as well:
-
-```bash
-python3 standalone_test.py YOUR_POSTAL_CODE YOUR_STREET_NUMBER --include-past
-```
-
 ## Credits
 
 This integration is based on the [Afvalbeheer](https://github.com/pippyn/Home-Assistant-Sensor-Afvalbeheer) integration.
