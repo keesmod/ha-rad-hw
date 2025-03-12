@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RAD Hoeksche Waard Afval",
+        "description": "Set up RAD Hoeksche Waard waste collection calendar",
+        "data": {
+          "postal_code": "Postal Code",
+          "street_number": "Street Number",
+          "date_format": "Date Format",
+          "resources": "Waste Types"
+        }
+      }
+    },
+    "error": {
+      "invalid_postal_code": "Invalid postal code format. Please use Dutch format (e.g. 1234AB)",
+      "invalid_street_number": "Invalid street number. Please enter a number"
+    },
+    "abort": {
+      "already_configured": "This address is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "RAD Hoeksche Waard Afval Options",
+        "description": "Configure waste collection options",
+        "data": {
+          "date_format": "Date Format",
+          "resources": "Waste Types"
+        }
+      }
+    }
+  }
+} 
