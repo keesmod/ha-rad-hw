@@ -4,6 +4,24 @@ Home Assistant integration for RAD Hoeksche Waard waste collection.
 
 ## Installation
 
+### Method 1: HACS (Recommended)
+
+1. Make sure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance.
+2. Add this repository as a custom repository in HACS:
+   - Go to HACS in your Home Assistant instance
+   - Click on "Integrations"
+   - Click the three dots in the top right corner
+   - Select "Custom repositories"
+   - Enter `https://github.com/keesmod/ha-rad-hw` in the "Repository" field
+   - Select "Integration" as the Category
+   - Click "Add"
+3. Search for "RAD Hoeksche Waard Afval" in HACS and install it
+4. Restart Home Assistant
+5. Add the integration via the Home Assistant UI (Settings -> Devices & Services -> Add Integration)
+6. Search for "RAD Hoeksche Waard Afval" and follow the configuration steps
+
+### Method 2: Manual Installation
+
 1. Copy the `custom_components/rad_hw_afval` directory to your Home Assistant `custom_components` directory.
 2. Restart Home Assistant.
 3. Add the integration via the Home Assistant UI.
@@ -12,8 +30,8 @@ Home Assistant integration for RAD Hoeksche Waard waste collection.
 
 The integration can be configured via the Home Assistant UI. You will need to provide:
 
-- Postal code (e.g., 3273LK)
-- Street number (e.g., 20)
+- Postal code (e.g., 3262CD)
+- Street number (e.g., 5)
 
 ## Features
 
@@ -66,6 +84,25 @@ logger:
 
 - **Missing waste types**: Some waste types might not have future collection dates in the API. The integration will show the most recent past date with the `is_past_date` attribute set to `true`.
 - **Different dates than shown in the RAD app**: Verify your postal code and street number are correct. If the dates still differ, please report it as an issue.
+
+## Testing
+
+The integration includes a standalone test script:
+
+- `standalone_test.py` - Tests the API client with live data
+
+To run the test:
+
+```bash
+cd custom_components/rad_hw_afval
+python3 standalone_test.py YOUR_POSTAL_CODE YOUR_STREET_NUMBER
+```
+
+Add the `--include-past` flag to see past collection dates as well:
+
+```bash
+python3 standalone_test.py YOUR_POSTAL_CODE YOUR_STREET_NUMBER --include-past
+```
 
 ## Credits
 
