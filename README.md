@@ -41,6 +41,50 @@ The integration can be configured via the Home Assistant UI. You will need to pr
 - If a future collection date isn't available, the most recent past date will be shown with an `is_past_date` attribute set to `true`
 - Compatible with Home Assistant 2025.3.2 and likely with earlier versions
 
+## Dashboard Example
+
+You can add the waste collection sensors to your Home Assistant dashboard using this example configuration:
+
+```yaml
+type: sections
+max_columns: 4
+title: Afval
+path: afval
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Afval
+        heading_style: title
+        icon: mdi:trash-can
+      - type: tile
+        entity: sensor.rad_hw_afval_gft
+        show_entity_picture: true
+        state_content:
+          - next_pickup_in_days
+          - state
+        grid_options:
+          columns: full
+      - type: tile
+        entity: sensor.rad_hw_afval_pmd
+        show_entity_picture: true
+        state_content:
+          - next_pickup_in_days
+          - state
+        grid_options:
+          columns: full
+      - type: tile
+        entity: sensor.rad_hw_afval_restafval
+        show_entity_picture: true
+        state_content:
+          - next_pickup_in_days
+          - state
+        grid_options:
+          columns: full
+```
+
+This creates a clean, modern layout that displays each waste type with the collection date and days until collection.
+
 ## Technical Details
 
 This integration uses the Ximmio API to fetch waste collection data for RAD Hoeksche Waard. The API endpoints used are:
