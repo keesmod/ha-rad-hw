@@ -2,13 +2,12 @@
 
 import asyncio
 import logging
-from datetime import datetime, date, timedelta
-from typing import Dict, Optional, Any
+from datetime import date, datetime, timedelta
+from typing import Any, Optional
 
 import aiohttp
 
 from .const import API_URL, COMPANY_CODE
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ class RadAfvalApiClient:
             "Referer": "https://radhw.ximmio.com/",
         }
 
-    async def async_get_data(self) -> Optional[Dict[str, Dict]]:
+    async def async_get_data(self) -> Optional[dict[str, dict]]:
         """Get waste collection data from the API."""
         try:
             _LOGGER.debug("Requesting waste collection data from %s", self.base_url)
@@ -133,7 +132,7 @@ class RadAfvalApiClient:
         except (KeyError, IndexError) as error:
             raise ApiError(f"Invalid address data response: {error}") from error
 
-    async def _get_calendar_data(self, address_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_calendar_data(self, address_id: str) -> Optional[dict[str, Any]]:
         """Get calendar data from the API."""
         url = f"{self.base_url}GetCalendar"
         now = datetime.now()
@@ -180,7 +179,7 @@ class RadAfvalApiClient:
                 f"HTTP error fetching calendar data: {error.status}", error.status
             ) from error
 
-    def _process_data(self, calendar_data: Dict[str, Any]) -> Dict[str, Dict]:
+    def _process_data(self, calendar_data: dict[str, Any]) -> dict[str, dict]:
         """Process the calendar data and extract waste collection dates."""
         result = {}
         today = datetime.now().date()
@@ -333,7 +332,7 @@ class RadAfvalApiClient:
 
         return result
 
-    def _extract_pickup_type(self, pickup: Dict[str, Any]) -> Optional[str]:
+    def _extract_pickup_type(self, pickup: dict[str, Any]) -> Optional[str]:
         """Extract pickup type from the pickup object."""
         # Try different field names that might contain the pickup type
         for field in [
@@ -352,7 +351,7 @@ class RadAfvalApiClient:
         _LOGGER.debug("Could not find pickup type in pickup object")
         return None
 
-    def _extract_pickup_date(self, pickup: Dict[str, Any]) -> Optional[str]:
+    def _extract_pickup_date(self, pickup: dict[str, Any]) -> Optional[str]:
         """Extract pickup date from the pickup object."""
         # Try different field names that might contain the pickup date
         for field in ["pickupDates", "date", "pickupDate"]:
@@ -375,10 +374,10 @@ class RadAfvalApiClient:
 
     def _process_pickup(
         self,
-        result: Dict[str, Dict],
+        result: dict[str, dict],
         pickup_type: str,
         pickup_date_str: str,
-        waste_type_mapping: Dict[str, str],
+        waste_type_mapping: dict[str, str],
         today: date,
     ) -> None:
         """Process a single pickup entry and add it to the result if valid."""
@@ -423,7 +422,7 @@ class RadAfvalApiClient:
             _LOGGER.warning("Invalid date format: %s - Error: %s", pickup_date_str, err)
 
     def _normalize_waste_type(
-        self, pickup_type: str, waste_type_mapping: Dict[str, str]
+        self, pickup_type: str, waste_type_mapping: dict[str, str]
     ) -> Optional[str]:
         """Normalize the waste type based on mapping."""
         # First try exact match
