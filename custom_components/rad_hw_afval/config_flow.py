@@ -52,8 +52,10 @@ class RadAfvalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: Dict[str, str] = {}
 
         if user_input is not None:
-            postal_code = user_input[CONF_POSTAL_CODE]
-            street_number = user_input[CONF_STREET_NUMBER]
+            # Sanitize inputs
+            raw_postal_code = str(user_input[CONF_POSTAL_CODE])
+            postal_code = re.sub(r"\s+", "", raw_postal_code.upper())
+            street_number = str(user_input[CONF_STREET_NUMBER]).strip()
 
             # Validate postal code format (Dutch format)
             if not re.match(r"^\d{4}[A-Z]{2}$", postal_code):
@@ -131,8 +133,8 @@ class RadAfvalOptionsFlowHandler(config_entries.OptionsFlow):
             [WASTE_TYPE_REST, WASTE_TYPE_GFT, WASTE_TYPE_PAPIER, WASTE_TYPE_PMD],
         )
 
-        date_format_default = self._config_entry.data.get(
-            CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT
+        date_format_default = self._config_entry.options.get(
+            CONF_DATE_FORMAT, self._config_entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
         )
 
         return self.async_show_form(
