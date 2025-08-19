@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate (hassfest + HACS)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+      - name: HACS validation
+        uses: hacs/action@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          category: integration
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Ruff check (lint)
+        run: |
+          ruff version
+          ruff check custom_components
+
+      - name: Ruff format (check only)
+        run: ruff format --check custom_components
+
+  smoke:
+    name: Smoke import (Home Assistant env)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Home Assistant test environment
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install pytest-homeassistant-custom-component
+
+      - name: Import integration modules
+        run: |
+          python - <<'PY'
+          import importlib
+          modules = [
+              'homeassistant',
+              'custom_components.rad_hw_afval',
+              'custom_components.rad_hw_afval.api',
+              'custom_components.rad_hw_afval.sensor',
+              'custom_components.rad_hw_afval.config_flow',
+              'custom_components.rad_hw_afval.coordinator',
+          ]
+          for module_name in modules:
+              importlib.import_module(module_name)
+          print('Smoke import succeeded for:', ', '.join(modules))
+          PY
+
+  tests:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('tests/**/*.py') != '' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install pytest pytest-cov pytest-asyncio pytest-timeout
+          pip install pytest-homeassistant-custom-component
+
+      - name: Run tests
+        env:
+          PYTHONWARNINGS: default
+        run: |
+          pytest -q --disable-warnings --maxfail=1 \
+            --cov=custom_components/rad_hw_afval --cov-report=xml
+
