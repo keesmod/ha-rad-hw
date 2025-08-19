@@ -1,5 +1,6 @@
 {
   "name": "RAD Hoeksche Waard Afval",
   "render_readme": true,
-  "homeassistant": "2025.3.2"
+  "homeassistant": "2025.3.2",
+  "brands": false
 } 
