@@ -336,7 +336,13 @@ class RadAfvalApiClient:
     def _extract_pickup_type(self, pickup: Dict[str, Any]) -> Optional[str]:
         """Extract pickup type from the pickup object."""
         # Try different field names that might contain the pickup type
-        for field in ["_pickupTypeText", "pickupType", "description", "wastetype"]:
+        for field in [
+            "pickupTypeText",  # common field name in API
+            "_pickupTypeText",  # sometimes present with underscore
+            "pickupType",
+            "description",
+            "wastetype",
+        ]:
             if field in pickup and pickup[field]:
                 _LOGGER.debug(
                     "Found pickup type in field '%s': %s", field, pickup[field]
