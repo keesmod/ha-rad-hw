@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ha-rad-hw"
+version = "1.2.1"
+description = "Home Assistant integration for RAD Hoeksche Waard waste collection"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "aiohttp>=3.9.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/keesmod/ha-rad-hw"
+Repository = "https://github.com/keesmod/ha-rad-hw"
+Issues = "https://github.com/keesmod/ha-rad-hw/issues"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "C4", "UP"]
+ignore = ["E501", "B008", "C901"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

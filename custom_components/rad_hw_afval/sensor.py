@@ -1,7 +1,7 @@
-"""Support for RAD Hoeksche Waard Afval sensors."""
+"""Sensor platform for RAD Hoeksche Waard Afval."""
 
 import logging
-from typing import Any, Dict, Final, Optional
+from typing import Any, Final, Optional
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -168,7 +168,7 @@ class RadAfvalSensor(CoordinatorEntity, SensorEntity):
         return None
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return the state attributes."""
         if not self.available:
             return {}

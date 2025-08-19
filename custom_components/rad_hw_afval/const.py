@@ -1,4 +1,5 @@
 """Constants for the RAD Hoeksche Waard Afval integration."""
+
 from datetime import timedelta
 
 DOMAIN = "rad_hw_afval"

@@ -2,14 +2,13 @@
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-import homeassistant.helpers.config_validation as cv
 
 from .const import (
     CONF_DATE_FORMAT,
@@ -46,10 +45,10 @@ class RadAfvalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return RadAfvalOptionsFlowHandler(config_entry)
 
     async def async_step_user(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Handle the initial step."""
-        errors: Dict[str, str] = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
             # Sanitize inputs
@@ -122,7 +121,7 @@ class RadAfvalOptionsFlowHandler(config_entries.OptionsFlow):
         self._config_entry = config_entry  # Store as a private attribute instead
 
     async def async_step_init(
-        self, user_input: Optional[Dict[str, Any]] = None
+        self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Handle options flow."""
         if user_input is not None:
@@ -134,7 +133,8 @@ class RadAfvalOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         date_format_default = self._config_entry.options.get(
-            CONF_DATE_FORMAT, self._config_entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
+            CONF_DATE_FORMAT,
+            self._config_entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT),
         )
 
         return self.async_show_form(

@@ -1,10 +1,9 @@
 """Data update coordinator for the RAD Hoeksche Waard Afval integration."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 import async_timeout
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -44,7 +43,7 @@ class RadAfvalDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
 
-    async def _async_update_data(self) -> Dict[str, Any]:
+    async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from the RAD Hoeksche Waard Afval API."""
         postal_code = self.config_entry.data["postal_code"]
         street_number = self.config_entry.data["street_number"]
