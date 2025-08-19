@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Script to analyze the HAR file and extract API information."""
 
-import json
 import argparse
+import json
 from pprint import pprint
 
 
@@ -10,7 +10,7 @@ def analyze_har_file(har_file_path):
     """Analyze the HAR file and extract API information."""
     print(f"Analyzing HAR file: {har_file_path}")
 
-    with open(har_file_path, "r", encoding="utf-8") as f:
+    with open(har_file_path, encoding="utf-8") as f:
         har_data = json.load(f)
 
     entries = har_data.get("log", {}).get("entries", [])
