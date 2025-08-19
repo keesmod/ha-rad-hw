@@ -134,7 +134,8 @@ class RadAfvalOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         date_format_default = self._config_entry.options.get(
-            CONF_DATE_FORMAT, self._config_entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
+            CONF_DATE_FORMAT,
+            self._config_entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT),
         )
 
         return self.async_show_form(
