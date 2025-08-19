@@ -121,7 +121,7 @@ class RadAfvalSensor(CoordinatorEntity, SensorEntity):
             "name": f"RAD HW Afval {coordinator.config_entry.title}",
             "manufacturer": "RAD Hoeksche Waard",
             "model": "Afvalkalender",
-            "sw_version": "1.2.1",
+            "sw_version": "1.2.2",
         }
 
         _LOGGER.debug(
