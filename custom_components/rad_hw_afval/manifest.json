@@ -1,12 +1,12 @@
 {
   "domain": "rad_hw_afval",
   "name": "RAD Hoeksche Waard Afval",
-  "documentation": "https://github.com/custom-components/rad_hw_afval",
-  "issue_tracker": "https://github.com/custom-components/rad_hw_afval/issues",
-  "dependencies": [],
-  "config_flow": true,
   "codeowners": ["@pboudewijns"],
-  "requirements": ["aiohttp>=3.9.1"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/custom-components/rad_hw_afval",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/custom-components/rad_hw_afval/issues",
+  "requirements": ["aiohttp>=3.9.1"],
   "version": "1.2.1"
 } 
