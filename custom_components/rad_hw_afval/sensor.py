@@ -59,7 +59,9 @@ async def async_setup_entry(
     """Set up the RAD Hoeksche Waard Afval sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     waste_types = entry.options.get(CONF_RESOURCES, list(SENSOR_TYPES.keys()))
-    date_format = entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
+    date_format = entry.options.get(
+        CONF_DATE_FORMAT, entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
+    )
 
     _LOGGER.debug(
         "Setting up RAD HW Afval sensors for %s with waste types: %s",
