@@ -278,6 +278,12 @@ Common problems:
 
 ## Changelog
 
+### 1.3.1
+
+- Marks the integration as Netherlands-only (`country: NL` in `hacs.json`) for
+  the HACS default list and the Home Assistant Marketplace. No functional
+  changes.
+
 ### 1.3.0
 
 - Works on Home Assistant 2026.10 and newer: the integration no longer depends on
