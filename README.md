@@ -15,35 +15,41 @@ Requires Home Assistant 2025.3.2 or newer.
 ### Home Assistant 2026.11 and newer (Marketplace)
 
 Since Home Assistant 2026.11, HACS is built into Home Assistant as the
-**Marketplace**. This integration is not in the default list, so you add it from a
-link:
+**Marketplace**.
 
 1. Go to **Settings** > **Marketplace**. Only administrators can open it. The first
    time, you have to accept the warning about community content.
-2. In the upper-right corner, select **Add from link**.
-3. Under **GitHub link**, enter `keesmod/ha-rad-hw` and select **Add**. Adding a
-   custom repository requires a connected GitHub account. If you have not
-   connected one yet, the Marketplace asks you to do so. If it asks for the type,
-   choose **Integration**.
-4. Open the repository in the list, select **Install** and confirm.
-5. If the setup dialog does not open on its own, go to **Settings** > **Devices &
+2. Search for **RAD Hoeksche Waard Afval** and open it.
+3. Select **Install** and confirm.
+4. If the setup dialog does not open on its own, go to **Settings** > **Devices &
    services** > **Add integration** and search for **RAD Hoeksche Waard Afval**.
    If Home Assistant shows a repair asking for a restart, restart first.
 
 If you installed this integration through HACS before updating to 2026.11, the
 Marketplace migrates it automatically. You don't need to add it again.
 
+If the search does not find the integration, add it from a link instead:
+
+1. In **Settings** > **Marketplace**, select **Add from link** in the upper-right
+   corner.
+2. Under **GitHub link**, enter `keesmod/ha-rad-hw` and select **Add**. Adding a
+   repository from a link requires a connected GitHub account. If you have not
+   connected one yet, the Marketplace asks you to do so. If it asks for the type,
+   choose **Integration**.
+3. Open the repository in the list and continue with step 3 above.
+
 ### Home Assistant 2026.10 and older (HACS)
 
 1. Install [HACS](https://hacs.xyz/) if you don't have it yet.
-2. In HACS, open the three-dot menu in the upper-right corner and select
-   **Custom repositories**.
-3. Enter `https://github.com/keesmod/ha-rad-hw`, choose **Integration** as the
-   type (category), and select **Add**.
-4. Search for **RAD Hoeksche Waard Afval**, download it and restart Home
-   Assistant.
-5. Go to **Settings** > **Devices & services** > **Add integration** and search
+2. In HACS, search for **RAD Hoeksche Waard Afval**, open it, select
+   **Download** and restart Home Assistant.
+3. Go to **Settings** > **Devices & services** > **Add integration** and search
    for **RAD Hoeksche Waard Afval**.
+
+If HACS does not find the integration, add it as a custom repository first: open
+the three-dot menu in the upper-right corner, select **Custom repositories**, enter
+`https://github.com/keesmod/ha-rad-hw`, choose **Integration** as the type
+(category) and select **Add**. Then continue with step 2.
 
 ### Manual
 
@@ -277,6 +283,12 @@ Common problems:
   [open an issue](https://github.com/keesmod/ha-rad-hw/issues).
 
 ## Changelog
+
+### 1.3.3
+
+- The integration is now in the HACS default list and the Home Assistant
+  Marketplace. The installation instructions start with searching for it; adding
+  it from a link is the fallback. No functional changes.
 
 ### 1.3.2
 
