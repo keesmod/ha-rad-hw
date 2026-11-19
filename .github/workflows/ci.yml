@@ -35,8 +35,6 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # No brand images exist yet (local brand/ folder or home-assistant/brands).
-          ignore: brands
 
   lint:
     name: Lint (ruff)

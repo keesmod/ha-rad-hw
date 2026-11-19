@@ -281,6 +281,7 @@ Common problems:
   12 hours.
 - The documentation and issue links in the integration point to this repository.
 - The integration is shown as a service instead of a device.
+- The integration has its own icon (Home Assistant 2026.3 and newer).
 - Entity names follow Home Assistant's naming rules. The device page shows
   `Restafval` instead of repeating `RAD HW Afval`, and the friendly name now
   includes the address, e.g. `RAD HW Afval 1234AB 1 Restafval`. Entity IDs of
