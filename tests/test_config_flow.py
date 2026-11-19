@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock
 import aiohttp
 import pytest
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
-from homeassistant.const import ATTR_RESTORED, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -22,13 +21,12 @@ from custom_components.rad_hw_afval.const import (
     CONF_DATE_FORMAT,
     CONF_HOUSE_LETTER,
     CONF_POSTAL_CODE,
-    CONF_RESOURCES,
     CONF_STREET_NUMBER,
     DOMAIN,
 )
 
 from .conftest import (
-    ALL_WASTE_TYPES,
+    ENTITY_IDS,
     FETCH_ADDRESS_URL,
     GET_CALENDAR_URL,
     address_with_letter,
@@ -41,7 +39,6 @@ USER_INPUT = {
     CONF_POSTAL_CODE: "1234AB",
     CONF_STREET_NUMBER: "1",
     CONF_DATE_FORMAT: "%d-%m-%Y",
-    CONF_RESOURCES: list(ALL_WASTE_TYPES),
 }
 
 
@@ -75,14 +72,13 @@ def _fetch_payload(postal_code: str, number: int, letter: str) -> dict[str, Any]
 
 
 async def test_form_shown(hass: HomeAssistant) -> None:
-    """The user step shows an empty form with all fields."""
+    """The user step asks for the address and date format, not waste types."""
     result = await _start(hass)
     assert result["errors"] == {}
     assert set(result["data_schema"].schema) == {
         CONF_POSTAL_CODE,
         CONF_STREET_NUMBER,
         CONF_DATE_FORMAT,
-        CONF_RESOURCES,
     }
 
 
@@ -91,8 +87,8 @@ async def test_create_entry(
     mock_api_ok: AiohttpClientMocker,
     mock_setup_entry: AsyncMock,
 ) -> None:
-    """A valid address creates an entry with the v1.2.2 data layout."""
-    result = await _submit(hass, **{CONF_RESOURCES: ["rest", "pmd"]})
+    """A valid address creates a current entry (version 1.2) without options."""
+    result = await _submit(hass)
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "1234AB 1"
@@ -101,10 +97,12 @@ async def test_create_entry(
         CONF_STREET_NUMBER: "1",
         CONF_DATE_FORMAT: "%d-%m-%Y",
     }
-    assert result["options"] == {CONF_RESOURCES: ["rest", "pmd"]}
+    assert result["options"] == {}
     entry = result["result"]
     assert entry.unique_id == "1234AB_1"
-    assert entry.options == {CONF_RESOURCES: ["rest", "pmd"]}
+    assert entry.version == 1
+    assert entry.minor_version == 2
+    assert entry.options == {}
     assert len(mock_setup_entry.mock_calls) == 1
 
     assert api_payloads(mock_api_ok, FETCH_ADDRESS_URL) == [
@@ -118,7 +116,7 @@ async def test_create_entry_defaults(
     mock_api_ok: AiohttpClientMocker,
     mock_setup_entry: AsyncMock,
 ) -> None:
-    """Date format and waste types fall back to their defaults."""
+    """The date format falls back to its default."""
     result = await _start(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_POSTAL_CODE: "1234AB", CONF_STREET_NUMBER: "1"}
@@ -126,7 +124,7 @@ async def test_create_entry_defaults(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_DATE_FORMAT] == "%d-%m-%Y"
-    assert sorted(result["options"][CONF_RESOURCES]) == sorted(ALL_WASTE_TYPES)
+    assert result["options"] == {}
 
 
 @pytest.mark.parametrize("street_number", ["12a", "12A", "12 A", "12-a", " 12 - a "])
@@ -216,30 +214,15 @@ async def test_invalid_house_number(
     assert aioclient_mock.call_count == 0
 
 
-async def test_no_waste_types(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
-    """At least one waste type must be selected."""
-    result = await _submit(hass, **{CONF_RESOURCES: []})
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {CONF_RESOURCES: "no_waste_types"}
-    assert aioclient_mock.call_count == 0
-
-
 async def test_multiple_errors(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
     """All field errors are reported together."""
-    result = await _submit(
-        hass,
-        **{CONF_POSTAL_CODE: "x", CONF_STREET_NUMBER: "y", CONF_RESOURCES: []},
-    )
+    result = await _submit(hass, **{CONF_POSTAL_CODE: "x", CONF_STREET_NUMBER: "y"})
 
     assert result["errors"] == {
         CONF_POSTAL_CODE: "invalid_postal_code",
         CONF_STREET_NUMBER: "invalid_street_number",
-        CONF_RESOURCES: "no_waste_types",
     }
     assert aioclient_mock.call_count == 0
 
@@ -323,70 +306,77 @@ async def test_options_flow(
     init_integration: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    """Changing the options reloads the entry with the new selection."""
+    """The options flow only changes the date format and reloads the entry."""
     entry = init_integration
     calls = aioclient_mock.call_count
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
+    assert not result["errors"]
+    assert set(result["data_schema"].schema) == {CONF_DATE_FORMAT}
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {CONF_RESOURCES: ["rest", "pmd"], CONF_DATE_FORMAT: "%Y-%m-%d"},
+        result["flow_id"], {CONF_DATE_FORMAT: "%Y-%m-%d"}
     )
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options == {
-        CONF_RESOURCES: ["rest", "pmd"],
-        CONF_DATE_FORMAT: "%Y-%m-%d",
-    }
+    assert entry.options == {CONF_DATE_FORMAT: "%Y-%m-%d"}
     assert entry.state is ConfigEntryState.LOADED
     # The reload created a new client, which looked up the address again.
     assert aioclient_mock.call_count == calls + 2
 
-    rest = hass.states.get("sensor.rad_hw_afval_1234ab_1_restafval")
+    rest = hass.states.get(ENTITY_IDS["rest"])
     assert rest.state == "2026-12-04"
     assert rest.attributes["formatted_date"] == "2026-12-04"
-    assert hass.states.get("sensor.rad_hw_afval_1234ab_1_pmd").state == "2026-11-19"
-    for entity_id in (
-        "sensor.rad_hw_afval_1234ab_1_gft",
-        "sensor.rad_hw_afval_1234ab_1_oud_papier",
-    ):
+    # Every waste type keeps its sensor.
+    for waste_type, entity_id in ENTITY_IDS.items():
         state = hass.states.get(entity_id)
-        assert state.state == STATE_UNAVAILABLE
-        assert state.attributes.get(ATTR_RESTORED) is True
+        assert state is not None, entity_id
+        assert state.attributes["waste_type"] == waste_type
 
 
-async def test_options_flow_defaults(hass: HomeAssistant) -> None:
-    """The form defaults to the current options, then to the entry data."""
-    entry = create_entry(
-        data={
-            CONF_POSTAL_CODE: "1234AB",
-            CONF_STREET_NUMBER: "1",
-            CONF_DATE_FORMAT: "%d/%m/%Y",
-        },
-        options={CONF_RESOURCES: ["gft"]},
-    )
+@pytest.mark.parametrize(
+    ("data_format", "options", "expected"),
+    [
+        pytest.param("%d/%m/%Y", {CONF_DATE_FORMAT: "%Y"}, "%Y", id="from_options"),
+        pytest.param("%d/%m/%Y", {}, "%d/%m/%Y", id="from_data"),
+        pytest.param(None, {}, "%d-%m-%Y", id="default"),
+    ],
+)
+async def test_options_flow_defaults(
+    hass: HomeAssistant,
+    data_format: str | None,
+    options: dict[str, Any],
+    expected: str,
+) -> None:
+    """The form suggests the current options, then the entry data."""
+    data = {CONF_POSTAL_CODE: "1234AB", CONF_STREET_NUMBER: "1"}
+    if data_format is not None:
+        data[CONF_DATE_FORMAT] = data_format
+    entry = create_entry(data=data, options=options)
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
 
-    defaults = {str(key): key.default() for key in result["data_schema"].schema}
-    assert defaults == {CONF_RESOURCES: ["gft"], CONF_DATE_FORMAT: "%d/%m/%Y"}
+    schema = result["data_schema"].schema
+    assert {str(key): key.description["suggested_value"] for key in schema} == {
+        CONF_DATE_FORMAT: expected
+    }
+    # The default is the built-in format, so clearing the field resets it.
+    assert {str(key): key.default() for key in schema} == {CONF_DATE_FORMAT: "%d-%m-%Y"}
 
 
-async def test_options_flow_requires_waste_type(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+async def test_options_flow_cleared_field_resets_default(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
 ) -> None:
-    """An empty selection is rejected and the options stay unchanged."""
-    entry = init_integration
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_RESOURCES: [], CONF_DATE_FORMAT: "%d-%m-%Y"}
-    )
+    """Submitting the form without a value stores the default format."""
+    entry = create_entry(options={CONF_DATE_FORMAT: "%Y"})
+    entry.add_to_hass(hass)
 
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {CONF_RESOURCES: "no_waste_types"}
-    assert entry.options == {CONF_RESOURCES: list(ALL_WASTE_TYPES)}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {CONF_DATE_FORMAT: "%d-%m-%Y"}

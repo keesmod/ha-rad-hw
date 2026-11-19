@@ -13,6 +13,8 @@ REQUEST_TIMEOUT: Final = 30  # seconds per API request
 CONF_POSTAL_CODE: Final = "postal_code"
 CONF_STREET_NUMBER: Final = "street_number"
 CONF_HOUSE_LETTER: Final = "house_letter"
+# Integration 1.2.x stored the selected waste types in the options. Every waste
+# type now has a sensor; the migration in __init__.py disables deselected ones.
 CONF_RESOURCES: Final = "resources"
 CONF_DATE_FORMAT: Final = "date_format"
 

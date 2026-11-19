@@ -10,8 +10,12 @@ from typing import Any
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import ATTR_RESTORED, STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    ATTR_RESTORED,
+    EVENT_STATE_CHANGED,
+    STATE_UNAVAILABLE,
+)
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -21,10 +25,15 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 
 from custom_components.rad_hw_afval.api import parse_calendar
-from custom_components.rad_hw_afval.const import RETRY_INTERVAL, SCAN_INTERVAL
+from custom_components.rad_hw_afval.const import (
+    CONF_DATE_FORMAT,
+    RETRY_INTERVAL,
+    SCAN_INTERVAL,
+)
 from custom_components.rad_hw_afval.coordinator import RadAfvalDataUpdateCoordinator
 
 from .conftest import (
+    ENTITY_IDS,
     FETCH_ADDRESS_URL,
     GET_CALENDAR_URL,
     api_payloads,
@@ -33,7 +42,7 @@ from .conftest import (
 )
 
 INTEGRATION_LOGGER = "custom_components.rad_hw_afval"
-ENTITY_ID = "sensor.rad_hw_afval_1234ab_1_restafval"
+ENTITY_ID = ENTITY_IDS["rest"]
 
 
 def _traceback_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
@@ -211,14 +220,74 @@ async def test_options_update_reloads_entry(
     old_coordinator = entry.runtime_data
     calls = aioclient_mock.call_count
 
-    hass.config_entries.async_update_entry(entry, options={"resources": ["gft"]})
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_DATE_FORMAT: "%Y/%m/%d"}
+    )
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED
     assert entry.runtime_data is not old_coordinator
     assert aioclient_mock.call_count == calls + 2
-    assert hass.states.get("sensor.rad_hw_afval_1234ab_1_gft").state == "2026-11-27"
-    # The deselected type is no longer provided by the integration.
-    restafval = hass.states.get(ENTITY_ID)
-    assert restafval.state == STATE_UNAVAILABLE
-    assert restafval.attributes.get(ATTR_RESTORED) is True
+    assert hass.states.get(ENTITY_ID).attributes["formatted_date"] == "2026/12/04"
+    # All waste types are still provided by the integration.
+    for entity_id in ENTITY_IDS.values():
+        state = hass.states.get(entity_id)
+        assert state.state != STATE_UNAVAILABLE, entity_id
+        assert ATTR_RESTORED not in state.attributes
+
+
+@pytest.mark.parametrize("changed", [False, True], ids=["unchanged", "changed"])
+async def test_unchanged_calendar_does_not_write_state(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    frozen_time: FrozenDateTimeFactory,
+    changed: bool,
+) -> None:
+    """A refresh that returns the same calendar does not touch the sensors.
+
+    An identical state write never fires state_changed, so the check that
+    always_update=False skips the write is that ``last_reported`` stays put.
+    """
+    coordinator = init_integration.runtime_data
+    assert coordinator.always_update is False
+
+    calendar = load_json("calendar.json")
+    if changed:
+        # An extra restafval pickup tomorrow makes it the next one.
+        calendar["dataList"].append(
+            {"pickupDates": ["2026-11-20T00:00:00"], "_pickupTypeText": "GREY"}
+        )
+    aioclient_mock.clear_requests()
+    mock_api(aioclient_mock, calendar=calendar)
+
+    # HA updates last_reported in place, so keep the values, not the states.
+    reported = {
+        entity_id: hass.states.get(entity_id).last_reported
+        for entity_id in ENTITY_IDS.values()
+    }
+    changes: list[str] = []
+
+    @callback
+    def _changed(event: Event[EventStateChangedData]) -> None:
+        if event.data["entity_id"] in reported:
+            changes.append(event.data["entity_id"])
+
+    hass.bus.async_listen(EVENT_STATE_CHANGED, _changed)
+
+    frozen_time.tick(SCAN_INTERVAL)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert len(api_payloads(aioclient_mock, GET_CALENDAR_URL)) == 1
+    assert coordinator.last_update_success
+    if not changed:
+        assert changes == []
+        for entity_id, last_reported in reported.items():
+            assert hass.states.get(entity_id).last_reported == last_reported
+    else:
+        assert changes == [ENTITY_ID]
+        assert hass.states.get(ENTITY_ID).state == "2026-11-20"
+        # The listeners ran, so the unchanged sensors were written as well.
+        for entity_id, last_reported in reported.items():
+            assert hass.states.get(entity_id).last_reported > last_reported

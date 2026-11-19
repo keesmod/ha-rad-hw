@@ -21,7 +21,6 @@ from homeassistant.util import dt as dt_util
 from .api import next_pickup
 from .const import (
     CONF_DATE_FORMAT,
-    CONF_RESOURCES,
     DEFAULT_DATE_FORMAT,
     DOMAIN,
     SENSOR_TYPES,
@@ -58,9 +57,8 @@ async def async_setup_entry(
     entry: RadAfvalConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the sensors for the selected waste types."""
+    """Set up one sensor per waste type."""
     coordinator = entry.runtime_data
-    waste_types = entry.options.get(CONF_RESOURCES, list(SENSOR_TYPES))
     # An empty stored format falls back to the default, as in 1.2.x.
     date_format = (
         entry.options.get(CONF_DATE_FORMAT, entry.data.get(CONF_DATE_FORMAT))
@@ -77,11 +75,8 @@ async def async_setup_entry(
     )
 
     async_add_entities(
-        RadAfvalSensor(
-            coordinator, SENSOR_DESCRIPTIONS[waste_type], device_info, date_format
-        )
-        for waste_type in waste_types
-        if waste_type in SENSOR_DESCRIPTIONS
+        RadAfvalSensor(coordinator, description, device_info, date_format)
+        for description in SENSOR_DESCRIPTIONS.values()
     )
 
 

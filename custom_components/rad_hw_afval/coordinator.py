@@ -43,6 +43,7 @@ class RadAfvalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, list[date]]]
             config_entry=entry,
             name=f"{DOMAIN}_{entry.unique_id}",
             update_interval=SCAN_INTERVAL,
+            always_update=False,
         )
         self.api = RadAfvalApiClient(
             async_get_clientsession(hass),

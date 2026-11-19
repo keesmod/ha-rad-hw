@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
@@ -21,11 +20,9 @@ from .const import (
     CONF_DATE_FORMAT,
     CONF_HOUSE_LETTER,
     CONF_POSTAL_CODE,
-    CONF_RESOURCES,
     CONF_STREET_NUMBER,
     DEFAULT_DATE_FORMAT,
     DOMAIN,
-    SENSOR_TYPES,
 )
 
 POSTAL_CODE_RE = re.compile(r"[0-9]{4}[A-Z]{2}")
@@ -37,10 +34,12 @@ USER_SCHEMA = vol.Schema(
         vol.Required(CONF_POSTAL_CODE): str,
         vol.Required(CONF_STREET_NUMBER): str,
         vol.Optional(CONF_DATE_FORMAT, default=DEFAULT_DATE_FORMAT): str,
-        vol.Required(CONF_RESOURCES, default=list(SENSOR_TYPES)): cv.multi_select(
-            SENSOR_TYPES
-        ),
     }
+)
+
+# Clearing the field falls back to the default format.
+OPTIONS_SCHEMA = vol.Schema(
+    {vol.Optional(CONF_DATE_FORMAT, default=DEFAULT_DATE_FORMAT): str}
 )
 
 
@@ -56,6 +55,7 @@ class RadAfvalConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for RAD Hoeksche Waard Afval."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     @staticmethod
     @callback
@@ -77,8 +77,6 @@ class RadAfvalConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_POSTAL_CODE] = "invalid_postal_code"
             if house is None:
                 errors[CONF_STREET_NUMBER] = "invalid_street_number"
-            if not user_input.get(CONF_RESOURCES):
-                errors[CONF_RESOURCES] = "no_waste_types"
 
             if not errors and house is not None:
                 number, letter = house
@@ -107,7 +105,6 @@ class RadAfvalConfigFlow(ConfigFlow, domain=DOMAIN):
                     return self.async_create_entry(
                         title=f"{postal_code} {number}{letter}",
                         data=data,
-                        options={CONF_RESOURCES: user_input[CONF_RESOURCES]},
                     )
 
         return self.async_show_form(
@@ -118,32 +115,22 @@ class RadAfvalConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class RadAfvalOptionsFlow(OptionsFlow):
-    """Change the waste types and date format."""
+    """Change the date format."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the options."""
-        errors: dict[str, str] = {}
         if user_input is not None:
-            if user_input.get(CONF_RESOURCES):
-                return self.async_create_entry(data=user_input)
-            errors[CONF_RESOURCES] = "no_waste_types"
+            return self.async_create_entry(data=user_input)
 
         entry = self.config_entry
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_RESOURCES,
-                    default=entry.options.get(CONF_RESOURCES, list(SENSOR_TYPES)),
-                ): cv.multi_select(SENSOR_TYPES),
-                vol.Optional(
-                    CONF_DATE_FORMAT,
-                    default=entry.options.get(
-                        CONF_DATE_FORMAT,
-                        entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT),
-                    ),
-                ): str,
-            }
+        current = entry.options.get(
+            CONF_DATE_FORMAT, entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
         )
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA, {CONF_DATE_FORMAT: current}
+            ),
+        )

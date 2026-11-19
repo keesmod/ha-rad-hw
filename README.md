@@ -61,7 +61,6 @@ Setup asks for:
 | --- | --- |
 | Postal code | Dutch postal code, e.g. `1234AB`. Spaces and lowercase letters are accepted. |
 | House number | A number with an optional house letter: `1`, `12a`, `12 A` and `12-a` all work. If your address has a house letter, enter it. Other additions are not supported. |
-| Waste types | The waste types to create sensors for. Select at least one. |
 | Date format | [strftime](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes) format for the `formatted_date` attribute. Default: `%d-%m-%Y`. |
 
 During setup the integration looks up the address in RAD's calendar, so a typo
@@ -69,17 +68,29 @@ is reported straight away (see [Troubleshooting](#troubleshooting)). Each addres
 can be added once. To track several addresses, add the integration again for
 each address.
 
-To change the waste types or the date format later, go to **Settings** >
-**Devices & services** > **RAD Hoeksche Waard Afval** and select **Configure**.
-The integration reloads with the new options. When you deselect a waste type,
-its sensor stays behind as unavailable. You can delete it under **Settings** >
-**Devices & services** > **Entities**.
+To change the date format later, go to **Settings** > **Devices & services** >
+**RAD Hoeksche Waard Afval** and select the cogwheel (**Configure**) next to the
+address. Clear the field to go back to the default. The integration reloads with
+the new format.
 
 ## Entities
 
-The integration creates one sensor for each selected waste type. The sensors are
-grouped under a service named `RAD HW Afval <postal code> <house number>`, for
-example `RAD HW Afval 1234AB 1`.
+The integration creates one sensor for each waste type. The sensors are grouped
+under a service named `RAD HW Afval <postal code> <house number>`, for example
+`RAD HW Afval 1234AB 1`.
+
+Don't need a waste type? Disable its sensor:
+
+1. Go to **Settings** > **Devices & services** > **Entities** and select the
+   sensor.
+2. Select the **Settings** (cogwheel) icon in the upper-right corner.
+3. Turn off **Enabled** and select **Update**.
+
+To enable it again, open the service page and select **+N disabled entities**,
+or use **Filters** > **Status** > **Disabled** in the entity list. An enabled
+sensor appears again after a short delay. See
+[Disabling an entity](https://www.home-assistant.io/docs/configuration/customizing-devices/)
+in the Home Assistant documentation.
 
 | Waste type | Sensor name | `waste_type` attribute |
 | --- | --- | --- |
@@ -114,7 +125,9 @@ the state looks like `2026-11-27`. On collection day the state is today's date.
 - **Upgrading from 1.2.x:** your entities keep their entity IDs, for example
   `sensor.rad_hw_afval_restafval`, `sensor.rad_hw_afval_gft`,
   `sensor.rad_hw_afval_oud_papier` and `sensor.rad_hw_afval_pmd`. Your automations
-  and dashboards keep working.
+  and dashboards keep working. Waste types you had deselected in 1.2.x are added
+  as disabled sensors. If 1.2.x never created that sensor, it gets a new-style
+  entity ID, for example `sensor.rad_hw_afval_1234ab_1_pmd`.
 - **New installations:** entity IDs are derived from the service name and the
   sensor name, for example `sensor.rad_hw_afval_1234ab_1_restafval` and
   `sensor.rad_hw_afval_1234ab_1_oud_papier`.
@@ -256,8 +269,7 @@ Common problems:
 - **All sensors are unavailable:** the last calendar download failed. The
   integration tries again every 30 minutes. Check the log for the error.
 - **One sensor is unavailable:** the calendar contains no dates for that waste
-  type at your address. You can deselect the waste type in the options and then
-  delete the leftover entity.
+  type at your address. You can disable that sensor (see [Entities](#entities)).
 - **A sensor shows a past date:** see the year-end fallback in
   [How it works](#how-it-works).
 - **Dates differ from the RAD app:** check the postal code, house number and
@@ -282,6 +294,10 @@ Common problems:
 - The documentation and issue links in the integration point to this repository.
 - The integration is shown as a service instead of a device.
 - The integration has its own icon (Home Assistant 2026.3 and newer).
+- All four waste types always get a sensor, following Home Assistant's
+  guidelines; the waste type selection in setup and options is gone. Disable the
+  sensors you don't need. When you upgrade, waste types you had deselected
+  become disabled sensors, so nothing new appears on your dashboards.
 - Entity names follow Home Assistant's naming rules. The device page shows
   `Restafval` instead of repeating `RAD HW Afval`, and the friendly name now
   includes the address, e.g. `RAD HW Afval 1234AB 1 Restafval`. Entity IDs of

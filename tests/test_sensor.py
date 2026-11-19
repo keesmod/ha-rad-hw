@@ -30,7 +30,6 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 from custom_components.rad_hw_afval.const import (
     CONF_DATE_FORMAT,
     CONF_POSTAL_CODE,
-    CONF_RESOURCES,
     CONF_STREET_NUMBER,
     DOMAIN,
     RETRY_INTERVAL,
@@ -39,20 +38,16 @@ from custom_components.rad_hw_afval.const import (
 
 from .conftest import (
     ALL_WASTE_TYPES,
+    ENTITY_IDS,
     FETCH_ADDRESS_URL,
     GET_CALENDAR_URL,
+    V122_ENTITY_IDS,
     api_payloads,
     create_entry,
     load_json,
     mock_api,
 )
 
-ENTITY_IDS = {
-    "rest": "sensor.rad_hw_afval_1234ab_1_restafval",
-    "gft": "sensor.rad_hw_afval_1234ab_1_gft",
-    "papier": "sensor.rad_hw_afval_1234ab_1_oud_papier",
-    "pmd": "sensor.rad_hw_afval_1234ab_1_pmd",
-}
 NAMES = {
     "rest": "Restafval",
     "gft": "GFT",
@@ -64,13 +59,6 @@ ICONS = {
     "gft": "mdi:leaf",
     "papier": "mdi:newspaper",
     "pmd": "mdi:recycle",
-}
-# v1.2.2 had no has_entity_name and named entities "RAD HW Afval <type>".
-V122_ENTITY_IDS = {
-    "rest": "sensor.rad_hw_afval_restafval",
-    "gft": "sensor.rad_hw_afval_gft",
-    "papier": "sensor.rad_hw_afval_oud_papier",
-    "pmd": "sensor.rad_hw_afval_pmd",
 }
 
 
@@ -136,7 +124,7 @@ async def test_sensor_states(
 async def test_entity_registry(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Entities use the v1.2.2 unique IDs and belong to the entry."""
+    """All four entities use the v1.2.2 unique IDs and start enabled."""
     entity_registry = er.async_get(hass)
     entries = er.async_entries_for_config_entry(
         entity_registry, init_integration.entry_id
@@ -146,6 +134,7 @@ async def test_entity_registry(
         for waste_type in ALL_WASTE_TYPES
     }
     for entry in entries:
+        assert entry.disabled_by is None
         assert entry.has_entity_name
         assert entry.original_name == NAMES[entry.unique_id.rsplit("_", 1)[1]]
 
@@ -169,44 +158,11 @@ async def test_device(hass: HomeAssistant, init_integration: MockConfigEntry) ->
         assert entity_registry.async_get(entity_id).device_id == device.id
 
 
-@pytest.mark.parametrize(
-    ("options", "expected"),
-    [
-        pytest.param(
-            {CONF_RESOURCES: ["gft", "papier"]}, {"gft", "papier"}, id="subset"
-        ),
-        pytest.param({CONF_RESOURCES: ["pmd"]}, {"pmd"}, id="single"),
-        pytest.param(
-            {CONF_RESOURCES: ["rest", "textiel"]}, {"rest"}, id="unknown_ignored"
-        ),
-        pytest.param({}, set(ALL_WASTE_TYPES), id="no_options_defaults_to_all"),
-    ],
-)
-async def test_only_selected_resources(
-    hass: HomeAssistant,
-    mock_api_ok: AiohttpClientMocker,
-    options: dict[str, Any],
-    expected: set[str],
-) -> None:
-    """Only the selected waste types get an entity."""
-    entry = create_entry(options=options)
-    await _setup(hass, entry)
-
-    entries = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
-    assert {entry.unique_id for entry in entries} == {
-        f"1234AB_1_{waste_type}" for waste_type in expected
-    }
-    for waste_type, entity_id in ENTITY_IDS.items():
-        assert (hass.states.get(entity_id) is not None) is (waste_type in expected)
-
-
 async def test_date_format_option_overrides_data(
     hass: HomeAssistant, mock_api_ok: AiohttpClientMocker
 ) -> None:
     """The date format from the options wins over the one from setup."""
-    entry = create_entry(
-        options={CONF_RESOURCES: ["rest"], CONF_DATE_FORMAT: "%A %d %B %Y"}
-    )
+    entry = create_entry(options={CONF_DATE_FORMAT: "%A %d %B %Y"})
     await _setup(hass, entry)
     assert (
         hass.states.get(ENTITY_IDS["rest"]).attributes["formatted_date"]
@@ -232,7 +188,7 @@ async def test_empty_date_format_falls_back_to_default(
     data = {CONF_POSTAL_CODE: "1234AB", CONF_STREET_NUMBER: "1"}
     if data_format is not None:
         data[CONF_DATE_FORMAT] = data_format
-    options: dict[str, Any] = {CONF_RESOURCES: ["rest"]}
+    options: dict[str, Any] = {}
     if options_format is not None:
         options[CONF_DATE_FORMAT] = options_format
     await _setup(hass, create_entry(data=data, options=options))

@@ -25,7 +25,6 @@ from custom_components.rad_hw_afval.const import (
     API_URL,
     CONF_DATE_FORMAT,
     CONF_POSTAL_CODE,
-    CONF_RESOURCES,
     CONF_STREET_NUMBER,
     DOMAIN,
 )
@@ -46,6 +45,20 @@ ENTRY_DATA = {
     CONF_STREET_NUMBER: "1",
     CONF_DATE_FORMAT: "%d-%m-%Y",
 }
+# Entity IDs for 1234AB 1 as registered by 1.3.0 (has_entity_name).
+ENTITY_IDS = {
+    "rest": "sensor.rad_hw_afval_1234ab_1_restafval",
+    "gft": "sensor.rad_hw_afval_1234ab_1_gft",
+    "papier": "sensor.rad_hw_afval_1234ab_1_oud_papier",
+    "pmd": "sensor.rad_hw_afval_1234ab_1_pmd",
+}
+# v1.2.2 had no has_entity_name and named entities "RAD HW Afval <type>".
+V122_ENTITY_IDS = {
+    "rest": "sensor.rad_hw_afval_restafval",
+    "gft": "sensor.rad_hw_afval_gft",
+    "papier": "sensor.rad_hw_afval_oud_papier",
+    "pmd": "sensor.rad_hw_afval_pmd",
+}
 
 
 def load_json(name: str) -> Any:
@@ -59,14 +72,23 @@ def create_entry(
     options: dict[str, Any] | None = None,
     unique_id: str = UNIQUE_ID,
     title: str = TITLE,
+    version: int = 1,
+    minor_version: int = 2,
 ) -> MockConfigEntry:
-    """Create (but do not add) a config entry for the fictitious address."""
+    """Create (but do not add) a config entry for the fictitious address.
+
+    The default is a current entry (version 1, minor version 2), so setting
+    it up does not run the migration. Pass ``minor_version=1`` for an entry
+    written by integration 1.2.x or older.
+    """
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=unique_id,
         title=title,
         data=dict(ENTRY_DATA if data is None else data),
-        options={CONF_RESOURCES: list(ALL_WASTE_TYPES)} if options is None else options,
+        options={} if options is None else dict(options),
+        version=version,
+        minor_version=minor_version,
     )
 
 
@@ -132,7 +154,7 @@ def frozen_time(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
 
 @pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
-    """Return a config entry for 1234AB 1 with all waste types selected."""
+    """Return a current config entry for 1234AB 1 without options."""
     return create_entry()
 
 
