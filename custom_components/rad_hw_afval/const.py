@@ -1,37 +1,45 @@
 """Constants for the RAD Hoeksche Waard Afval integration."""
 
 from datetime import timedelta
+from typing import Final
 
-DOMAIN = "rad_hw_afval"
-SCAN_INTERVAL = timedelta(hours=12)
-CONF_POSTAL_CODE = "postal_code"
-CONF_STREET_NUMBER = "street_number"
-CONF_RESOURCES = "resources"
-CONF_DATE_FORMAT = "date_format"
+DOMAIN: Final = "rad_hw_afval"
 
-# Default values
-DEFAULT_DATE_FORMAT = "%d-%m-%Y"
+# The calendar changes rarely: poll twice a day, but retry sooner after a failure.
+SCAN_INTERVAL: Final = timedelta(hours=12)
+RETRY_INTERVAL: Final = timedelta(minutes=30)
+REQUEST_TIMEOUT: Final = 30  # seconds per API request
 
-# API URL for RAD Hoeksche Waard Afval
-API_URL = "https://wasteapi2.ximmio.com/api/"
+CONF_POSTAL_CODE: Final = "postal_code"
+CONF_STREET_NUMBER: Final = "street_number"
+CONF_HOUSE_LETTER: Final = "house_letter"
+CONF_RESOURCES: Final = "resources"
+CONF_DATE_FORMAT: Final = "date_format"
 
-# Company code for RAD Hoeksche Waard
-COMPANY_CODE = "13a2cad9-36d0-4b01-b877-efcb421a864d"
+DEFAULT_DATE_FORMAT: Final = "%d-%m-%Y"
 
-# Waste types
-WASTE_TYPE_REST = "rest"
-WASTE_TYPE_GFT = "gft"
-WASTE_TYPE_PAPIER = "papier"
-WASTE_TYPE_PMD = "pmd"
+# Ximmio API, as used by RAD's own online waste calendar.
+API_URL: Final = "https://wasteapi2.ximmio.com/api/"
+COMPANY_CODE: Final = "13a2cad9-36d0-4b01-b877-efcb421a864d"
+COMMUNITY: Final = "Hoeksche Waard"
 
-# Sensor attributes
-ATTR_NEXT_DATE = "next_date"
-ATTR_DAYS_UNTIL = "days_until"
+WASTE_TYPE_REST: Final = "rest"
+WASTE_TYPE_GFT: Final = "gft"
+WASTE_TYPE_PAPIER: Final = "papier"
+WASTE_TYPE_PMD: Final = "pmd"
 
-# Sensor names
-SENSOR_TYPES = {
+# Sensor key -> entity name.
+SENSOR_TYPES: Final = {
     WASTE_TYPE_REST: "Restafval",
     WASTE_TYPE_GFT: "GFT",
     WASTE_TYPE_PAPIER: "Oud Papier",
     WASTE_TYPE_PMD: "PMD",
+}
+
+# Ximmio pickup type code (field "_pickupTypeText") -> sensor key.
+PICKUP_TYPES: Final = {
+    "GREY": WASTE_TYPE_REST,
+    "GREEN": WASTE_TYPE_GFT,
+    "PAPER": WASTE_TYPE_PAPIER,
+    "PACKAGES": WASTE_TYPE_PMD,
 }
