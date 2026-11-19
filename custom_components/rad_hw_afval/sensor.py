@@ -1,22 +1,26 @@
 """Sensor platform for RAD Hoeksche Waard Afval."""
 
-import logging
-from typing import Any, Final, Optional
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Any, Final
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import StateType
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.loader import async_get_integration
+from homeassistant.util import dt as dt_util
 
+from .api import next_pickup
 from .const import (
     CONF_DATE_FORMAT,
-    CONF_RESOURCES,
     DEFAULT_DATE_FORMAT,
     DOMAIN,
     SENSOR_TYPES,
@@ -25,176 +29,118 @@ from .const import (
     WASTE_TYPE_PMD,
     WASTE_TYPE_REST,
 )
-from .coordinator import RadAfvalDataUpdateCoordinator
+from .coordinator import RadAfvalConfigEntry, RadAfvalDataUpdateCoordinator
 
-_LOGGER = logging.getLogger(__name__)
+# All entities share one coordinator and never poll themselves.
+PARALLEL_UPDATES = 0
 
-
-WASTE_TYPE_TO_ICON = {
+WASTE_TYPE_ICONS: Final = {
     WASTE_TYPE_REST: "mdi:trash-can",
     WASTE_TYPE_GFT: "mdi:leaf",
     WASTE_TYPE_PAPIER: "mdi:newspaper",
     WASTE_TYPE_PMD: "mdi:recycle",
 }
 
-
-# Create sensor descriptions
 SENSOR_DESCRIPTIONS: Final = {
     waste_type: SensorEntityDescription(
         key=waste_type,
-        name=SENSOR_TYPES[waste_type],
-        icon=WASTE_TYPE_TO_ICON.get(waste_type, "mdi:trash-can"),
+        name=name,
+        icon=WASTE_TYPE_ICONS[waste_type],
         device_class=SensorDeviceClass.DATE,
-        entity_category=None,
     )
-    for waste_type, friendly_name in SENSOR_TYPES.items()
+    for waste_type, name in SENSOR_TYPES.items()
 }
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    entry: RadAfvalConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the RAD Hoeksche Waard Afval sensor platform."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-    waste_types = entry.options.get(CONF_RESOURCES, list(SENSOR_TYPES.keys()))
-    date_format = entry.options.get(
-        CONF_DATE_FORMAT, entry.data.get(CONF_DATE_FORMAT, DEFAULT_DATE_FORMAT)
+    """Set up one sensor per waste type."""
+    coordinator = entry.runtime_data
+    # An empty stored format falls back to the default, as in 1.2.x.
+    date_format = (
+        entry.options.get(CONF_DATE_FORMAT, entry.data.get(CONF_DATE_FORMAT))
+        or DEFAULT_DATE_FORMAT
+    )
+    integration = await async_get_integration(hass, DOMAIN)
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, str(entry.unique_id))},
+        name=f"RAD HW Afval {entry.title}",
+        manufacturer="RAD Hoeksche Waard",
+        model="Afvalkalender",
+        sw_version=str(integration.version),
+        entry_type=DeviceEntryType.SERVICE,
     )
 
-    _LOGGER.debug(
-        "Setting up RAD HW Afval sensors for %s with waste types: %s",
-        entry.title,
-        waste_types,
+    async_add_entities(
+        RadAfvalSensor(coordinator, description, device_info, date_format)
+        for description in SENSOR_DESCRIPTIONS.values()
     )
 
-    entities = []
 
-    # Create sensor entities for each waste type
-    for waste_type in waste_types:
-        if waste_type in SENSOR_DESCRIPTIONS:
-            _LOGGER.debug("Creating sensor for waste type: %s", waste_type)
-            entities.append(
-                RadAfvalSensor(
-                    coordinator=coordinator,
-                    description=SENSOR_DESCRIPTIONS[waste_type],
-                    waste_type=waste_type,
-                    date_format=date_format,
-                )
-            )
-        else:
-            _LOGGER.warning("Unknown waste type: %s", waste_type)
+class RadAfvalSensor(CoordinatorEntity[RadAfvalDataUpdateCoordinator], SensorEntity):
+    """Next pickup date for one waste type."""
 
-    if entities:
-        _LOGGER.debug("Adding %d RAD HW Afval sensor entities", len(entities))
-        async_add_entities(entities)
-    else:
-        _LOGGER.error("No RAD HW Afval sensors were created!")
-
-
-class RadAfvalSensor(CoordinatorEntity, SensorEntity):
-    """Implementation of a RAD Hoeksche Waard Afval sensor."""
+    _attr_has_entity_name = True
 
     def __init__(
         self,
         coordinator: RadAfvalDataUpdateCoordinator,
         description: SensorEntityDescription,
-        waste_type: str,
-        date_format: Optional[str] = None,
+        device_info: DeviceInfo,
+        date_format: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self.waste_type = waste_type
-        self.date_format = date_format or DEFAULT_DATE_FORMAT
+        self._date_format = date_format
+        self._attr_unique_id = f"{coordinator.config_entry.unique_id}_{description.key}"
+        self._attr_device_info = device_info
 
-        # Set unique_id using the entry's unique_id and the waste type
-        self._attr_unique_id = f"{coordinator.config_entry.unique_id}_{waste_type}"
-
-        # Set the name
-        self._attr_name = f"RAD HW Afval {SENSOR_TYPES[waste_type]}"
-
-        # Set device info
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, coordinator.config_entry.unique_id)},
-            "name": f"RAD HW Afval {coordinator.config_entry.title}",
-            "manufacturer": "RAD Hoeksche Waard",
-            "model": "Afvalkalender",
-            "sw_version": "1.2.2",
-        }
-
-        _LOGGER.debug(
-            "Initialized sensor %s with unique_id %s",
-            self._attr_name,
-            self._attr_unique_id,
+    async def async_added_to_hass(self) -> None:
+        """Re-evaluate the state just after local midnight."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_change(
+                self.hass, self._async_midnight, hour=0, minute=0, second=1
+            )
         )
+
+    @callback
+    def _async_midnight(self, _now: datetime) -> None:
+        """Move to the next pickup date when the day changes."""
+        self.async_write_ha_state()
+
+    @property
+    def _dates(self) -> list[date]:
+        """Return all known pickup dates for this waste type."""
+        return (self.coordinator.data or {}).get(self.entity_description.key, [])
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-
-        # Check if the waste type is in the data
-        has_data = (
-            self.coordinator.data is not None
-            and self.waste_type in self.coordinator.data
-        )
-
-        if not has_data and _LOGGER.isEnabledFor(logging.DEBUG):
-            _LOGGER.debug(
-                "Sensor %s is unavailable because no data is available for waste type %s",
-                self._attr_name,
-                self.waste_type,
-            )
-
-        return has_data
+        """Return True if the last refresh worked and this type has dates."""
+        return super().available and bool(self._dates)
 
     @property
-    def native_value(self) -> StateType:
-        """Return the state of the sensor."""
-        if not self.available:
+    def native_value(self) -> date | None:
+        """Return the next pickup date."""
+        return next_pickup(self._dates, dt_util.now().date())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return days until pickup and the formatted date."""
+        today = dt_util.now().date()
+        pickup = next_pickup(self._dates, today)
+        if pickup is None:
             return None
 
-        waste_data = self.coordinator.data[self.waste_type]
-        next_date = waste_data.get("next_date")
-
-        # For date device class, we must return a date object directly
-        # The formatted date should go in the extra state attributes
-        if next_date:
-            return next_date  # Return the actual date object, not a string
-
-        return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the state attributes."""
-        if not self.available:
-            return {}
-
-        waste_data = self.coordinator.data[self.waste_type]
-        attributes = {
-            "next_pickup_in_days": waste_data.get("days_until"),
-            "waste_type": self.waste_type,
+        days_until = (pickup - today).days
+        attributes: dict[str, Any] = {
+            "next_pickup_in_days": days_until,
+            "waste_type": self.entity_description.key,
+            "is_past_date": days_until < 0,
         }
-
-        # Add formatted date as an attribute
-        next_date = waste_data.get("next_date")
-        if next_date:
-            # Add indicator if this is a past date
-            days_until = waste_data.get("days_until", 0)
-            attributes["is_past_date"] = days_until < 0
-
-            # Add formatted date
-            try:
-                attributes["formatted_date"] = next_date.strftime(self.date_format)
-            except ValueError as err:
-                _LOGGER.error(
-                    "Error formatting date %s with format %s: %s",
-                    next_date.isoformat(),
-                    self.date_format,
-                    err,
-                )
-
+        attributes["formatted_date"] = pickup.strftime(self._date_format)
         return attributes

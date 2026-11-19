@@ -1,0 +1,15 @@
+{
+  "dataList": [
+    {
+      "UniqueId": "0000000000000001",
+      "Street": "Teststraat",
+      "HouseNumber": "1",
+      "HouseLetter": "",
+      "HouseNumberAddition": "",
+      "ZipCode": "1234AB",
+      "City": "Teststad"
+    }
+  ],
+  "status": true,
+  "messageCode": 0
+}

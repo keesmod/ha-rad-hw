@@ -3,18 +3,24 @@
     "step": {
       "user": {
         "title": "RAD Hoeksche Waard Afval",
-        "description": "Configureer RAD Hoeksche Waard afvalkalender",
+        "description": "Stel de afvalkalender van RAD Hoeksche Waard in voor je adres.",
         "data": {
           "postal_code": "Postcode",
           "street_number": "Huisnummer",
-          "date_format": "Datumformaat",
-          "resources": "Afvaltypes"
+          "date_format": "Datumformaat"
+        },
+        "data_description": {
+          "postal_code": "Nederlandse postcode, bijv. 1234AB",
+          "street_number": "Huisnummer, eventueel met huisletter, bijv. 12 of 12a",
+          "date_format": "strftime-formaat voor het attribuut formatted_date"
         }
       }
     },
     "error": {
-      "invalid_postal_code": "Ongeldig postcode formaat. Gebruik Nederlands formaat (bijv. 1234AB)",
-      "invalid_street_number": "Ongeldig huisnummer. Voer een nummer in"
+      "invalid_postal_code": "Ongeldige postcode. Gebruik het Nederlandse formaat, bijv. 1234AB.",
+      "invalid_street_number": "Ongeldig huisnummer. Voer een nummer in, eventueel gevolgd door een letter (bijv. 12 of 12a).",
+      "address_not_found": "RAD Hoeksche Waard kent dit adres niet. Controleer postcode en huisnummer.",
+      "cannot_connect": "De afvalkalender van RAD Hoeksche Waard is niet bereikbaar. Probeer het later opnieuw."
     },
     "abort": {
       "already_configured": "Dit adres is al geconfigureerd"
@@ -23,13 +29,15 @@
   "options": {
     "step": {
       "init": {
-        "title": "RAD Hoeksche Waard Afval Opties",
-        "description": "Configureer afvalophaal opties",
+        "title": "RAD Hoeksche Waard Afval opties",
+        "description": "Stel het datumformaat in. Heb je een afvaltype niet nodig? Schakel dan de sensor uit.",
         "data": {
-          "date_format": "Datumformaat",
-          "resources": "Afvaltypes"
+          "date_format": "Datumformaat"
+        },
+        "data_description": {
+          "date_format": "strftime-formaat voor het attribuut formatted_date. Maak het veld leeg voor de standaard (%d-%m-%Y)."
         }
       }
     }
   }
-} 
+}

@@ -3,18 +3,24 @@
     "step": {
       "user": {
         "title": "RAD Hoeksche Waard Afval",
-        "description": "Set up RAD Hoeksche Waard waste collection calendar",
+        "description": "Set up the RAD Hoeksche Waard waste collection calendar for your address.",
         "data": {
-          "postal_code": "Postal Code",
-          "street_number": "Street Number",
-          "date_format": "Date Format",
-          "resources": "Waste Types"
+          "postal_code": "Postal code",
+          "street_number": "House number",
+          "date_format": "Date format"
+        },
+        "data_description": {
+          "postal_code": "Dutch postal code, e.g. 1234AB",
+          "street_number": "House number, optionally with a house letter, e.g. 12 or 12a",
+          "date_format": "strftime format for the formatted_date attribute"
         }
       }
     },
     "error": {
-      "invalid_postal_code": "Invalid postal code format. Please use Dutch format (e.g. 1234AB)",
-      "invalid_street_number": "Invalid street number. Please enter a number"
+      "invalid_postal_code": "Invalid postal code. Use the Dutch format, e.g. 1234AB.",
+      "invalid_street_number": "Invalid house number. Enter a number, optionally followed by a letter (e.g. 12 or 12a).",
+      "address_not_found": "RAD Hoeksche Waard does not know this address. Check the postal code and house number.",
+      "cannot_connect": "Could not reach the RAD Hoeksche Waard calendar service. Try again later."
     },
     "abort": {
       "already_configured": "This address is already configured"
@@ -23,13 +29,15 @@
   "options": {
     "step": {
       "init": {
-        "title": "RAD Hoeksche Waard Afval Options",
-        "description": "Configure waste collection options",
+        "title": "RAD Hoeksche Waard Afval options",
+        "description": "Configure the date format. Don't need a waste type? Disable its sensor.",
         "data": {
-          "date_format": "Date Format",
-          "resources": "Waste Types"
+          "date_format": "Date format"
+        },
+        "data_description": {
+          "date_format": "strftime format for the formatted_date attribute. Clear the field to use the default (%d-%m-%Y)."
         }
       }
     }
   }
-} 
+}

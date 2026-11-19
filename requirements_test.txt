@@ -1,0 +1,4 @@
+# Test dependencies. pytest-homeassistant-custom-component pins a matching
+# homeassistant release and brings pytest, pytest-asyncio, pytest-cov and
+# pytest-freezer.
+pytest-homeassistant-custom-component==0.13.375

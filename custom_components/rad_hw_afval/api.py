@@ -1,438 +1,160 @@
-"""API client for RAD Hoeksche Waard Afval."""
+"""Client for the Ximmio waste API used by RAD Hoeksche Waard."""
+
+from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date, datetime, timedelta
-from typing import Any, Optional
+from datetime import date, timedelta
+from typing import Any
 
 import aiohttp
 
-from .const import API_URL, COMPANY_CODE
+from .const import API_URL, COMMUNITY, COMPANY_CODE, PICKUP_TYPES, REQUEST_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
+# Past dates are only needed as a fallback when the next calendar year has not
+# been published yet.
+LOOKBACK = timedelta(days=90)
 
-class ApiError(Exception):
-    """Exception raised for API communication errors."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None):
-        """Initialize the exception."""
-        self.status_code = status_code
-        super().__init__(message)
+class RadAfvalError(Exception):
+    """The API could not be reached or returned an unusable response."""
+
+
+class RadAfvalAddressNotFoundError(RadAfvalError):
+    """The API does not know the address."""
 
 
 class RadAfvalApiClient:
-    """API client for RAD Hoeksche Waard Afval."""
+    """Fetch pickup dates for one address."""
 
     def __init__(
         self,
         session: aiohttp.ClientSession,
         postal_code: str,
-        street_number: str,
+        house_number: str,
+        house_letter: str = "",
     ) -> None:
-        """Initialize the API client."""
-        self.session = session
-        self.postal_code = postal_code.strip().replace(" ", "")  # Format postal code
-        self.street_number = street_number
-        self.base_url = API_URL
-        self.company_code = COMPANY_CODE
-        self._headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/91.0.4472.124 Safari/537.36"
+        """Initialize the client."""
+        self._session = session
+        self.postal_code = postal_code.replace(" ", "").upper()
+        self.house_number = house_number.strip()
+        self.house_letter = house_letter.strip().upper()
+        self._address_id: str | None = None
+
+    async def async_get_address_id(self) -> str:
+        """Return the Ximmio address ID, looking it up once."""
+        if self._address_id is not None:
+            return self._address_id
+
+        number: int | str = (
+            int(self.house_number) if self.house_number.isdigit() else self.house_number
+        )
+        body = await self._post(
+            "FetchAdress",
+            {
+                "companyCode": COMPANY_CODE,
+                "postCode": self.postal_code,
+                "houseNumber": number,
+                "houseLetter": self.house_letter,
+                "houseNumberAddition": "",
+            },
+        )
+        candidates = [
+            item for item in body.get("dataList") or [] if isinstance(item, dict)
+        ]
+
+        # Prefer an exact house letter match. Without a letter, fall back to the
+        # first result so that e.g. "20" still resolves when only "20A" exists.
+        address = next(
+            (
+                item
+                for item in candidates
+                if str(item.get("HouseLetter") or "").upper() == self.house_letter
             ),
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7",
-            "X-Requested-With": "XMLHttpRequest",
-            "Content-Type": "application/json",
-            "Referer": "https://radhw.ximmio.com/",
-        }
-
-    async def async_get_data(self) -> Optional[dict[str, dict]]:
-        """Get waste collection data from the API."""
-        try:
-            _LOGGER.debug("Requesting waste collection data from %s", self.base_url)
-
-            # Step 1: Get the address ID
-            address_id = await self._get_address_id()
-            if not address_id:
-                return None
-
-            # Step 2: Get the calendar data using the address ID
-            calendar_data = await self._get_calendar_data(address_id)
-            if not calendar_data:
-                return None
-
-            # Step 3: Process the calendar data
-            result = self._process_data(calendar_data)
-            return result
-
-        except ApiError as error:
-            _LOGGER.error("API Error: %s", error)
-            return None
-        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-            _LOGGER.error("Connection error: %s", error)
-            return None
-        except Exception as error:  # pylint: disable=broad-except
-            _LOGGER.exception("Unexpected error: %s", error)
-            return None
-
-    async def _get_address_id(self) -> Optional[str]:
-        """Get the address ID from the API."""
-        url = f"{self.base_url}FetchAdress"
-
-        # Convert house_number to integer if it's numeric
-        house_number = self.street_number
-        try:
-            if isinstance(house_number, str) and house_number.isdigit():
-                house_number = int(house_number)
-        except (ValueError, TypeError):
-            pass  # Keep original value if conversion fails
-
-        payload = {
-            "companyCode": self.company_code,
-            "postCode": self.postal_code,
-            "houseNumber": house_number,
-            "houseLetter": "",
-            "houseNumberAddition": "",
-        }
-
-        _LOGGER.debug("Getting address ID with payload: %s", payload)
-
-        try:
-            async with self.session.post(
-                url, headers=self._headers, json=payload
-            ) as response:
-                if response.status != 200:
-                    raise ApiError(
-                        f"Error getting address ID: {response.status} {response.reason}",
-                        response.status,
-                    )
-
-                address_data = await response.json()
-
-                if not address_data.get("dataList"):
-                    _LOGGER.error(
-                        "No addresses found for postal code %s and house number %s",
-                        self.postal_code,
-                        self.street_number,
-                    )
-                    return None
-
-                # Note: The API returns "UniqueId" with a capital U
-                address_id = address_data["dataList"][0]["UniqueId"]
-                _LOGGER.debug("Found address ID: %s", address_id)
-                return address_id
-
-        except aiohttp.ClientResponseError as error:
-            raise ApiError(
-                f"HTTP error fetching address ID: {error.status}", error.status
-            ) from error
-        except (KeyError, IndexError) as error:
-            raise ApiError(f"Invalid address data response: {error}") from error
-
-    async def _get_calendar_data(self, address_id: str) -> Optional[dict[str, Any]]:
-        """Get calendar data from the API."""
-        url = f"{self.base_url}GetCalendar"
-        now = datetime.now()
-
-        # Use a longer date range to match what the browser is doing
-        start_date = date(now.year, now.month, 1)
-        start_date = start_date - timedelta(days=90)  # Look back 3 months
-        end_date = date(now.year + 3, 1, 31)  # Look ahead 3 years
-
-        payload = {
-            "companyCode": self.company_code,
-            "uniqueAddressID": address_id,
-            "startDate": start_date.strftime("%Y-%m-%d"),
-            "endDate": end_date.strftime("%Y-%m-%d"),
-            "community": "Hoeksche Waard",  # Add community parameter
-        }
-
-        _LOGGER.debug("Getting calendar data with payload: %s", payload)
-
-        try:
-            async with self.session.post(
-                url, headers=self._headers, json=payload
-            ) as response:
-                if response.status != 200:
-                    raise ApiError(
-                        f"Error getting calendar data: {response.status} {response.reason}",
-                        response.status,
-                    )
-
-                calendar_data = await response.json()
-
-                if calendar_data is None:
-                    raise ApiError("Received empty calendar data from the API")
-
-                _LOGGER.debug(
-                    "Received calendar data with %d items",
-                    len(calendar_data.get("dataList", [])),
-                )
-
-                return calendar_data
-
-        except aiohttp.ClientResponseError as error:
-            raise ApiError(
-                f"HTTP error fetching calendar data: {error.status}", error.status
-            ) from error
-
-    def _process_data(self, calendar_data: dict[str, Any]) -> dict[str, dict]:
-        """Process the calendar data and extract waste collection dates."""
-        result = {}
-        today = datetime.now().date()
-
-        # Mapping of Ximmio waste types to our waste types
-        waste_type_mapping = {
-            # Exact matches from the API
-            "GREEN": "gft",
-            "GREY": "rest",
-            "PAPER": "papier",
-            "PACKAGES": "pmd",
-            "PLASTIC": "pmd",
-            "TEXTIEL": "textiel",
-            "GLAS": "glas",
-            # Additional mappings for flexibility
-            "REST": "rest",
-            "GFT": "gft",
-            "PAPIER": "papier",
-            "PMD": "pmd",
-            "Restafval": "rest",
-            "GFT-container": "gft",
-            "Papiercontainer": "papier",
-            "PMD-container": "pmd",
-            "Plastic": "pmd",
-            "Textiel": "textiel",
-            "Glas": "glas",
-        }
-
-        # Store most recent past dates as fallback
-        most_recent_past_dates = {}
-
-        try:
-            pickup_entries = calendar_data.get("dataList", [])
-
-            if not pickup_entries:
-                _LOGGER.warning("No pickup entries found in calendar data")
-                return result
-
-            _LOGGER.debug("Processing %d pickup entries", len(pickup_entries))
-
-            # Process all entries
-            for pickup_entry in pickup_entries:
-                try:
-                    # Extract pickup type
-                    pickup_type = self._extract_pickup_type(pickup_entry)
-                    if not pickup_type:
-                        continue
-
-                    # Find the normalized waste type
-                    normalized_type = self._normalize_waste_type(
-                        pickup_type, waste_type_mapping
-                    )
-                    if not normalized_type:
-                        continue
-
-                    # Process all pickup dates in the array
-                    pickup_dates = pickup_entry.get("pickupDates", [])
-                    if not pickup_dates:
-                        continue
-
-                    _LOGGER.debug(
-                        "Found %d dates for %s: %s",
-                        len(pickup_dates),
-                        pickup_type,
-                        pickup_dates,
-                    )
-
-                    for pickup_date_str in pickup_dates:
-                        try:
-                            # Parse the date string
-                            if (
-                                isinstance(pickup_date_str, str)
-                                and "T" in pickup_date_str
-                            ):
-                                pickup_date_str = pickup_date_str.split("T")[0]
-
-                            pickup_date = datetime.strptime(
-                                pickup_date_str, "%Y-%m-%d"
-                            ).date()
-
-                            # Calculate days until pickup
-                            days_until = (pickup_date - today).days
-
-                            if pickup_date >= today:
-                                # Future date - this is ideal
-                                if normalized_type in result:
-                                    existing_date = result[normalized_type]["next_date"]
-                                    if pickup_date < existing_date:
-                                        result[normalized_type] = {
-                                            "next_date": pickup_date,
-                                            "days_until": days_until,
-                                        }
-                                else:
-                                    result[normalized_type] = {
-                                        "next_date": pickup_date,
-                                        "days_until": days_until,
-                                    }
-                                    _LOGGER.debug(
-                                        "Found %s waste with pickup date: %s (%d days from now)",
-                                        normalized_type,
-                                        pickup_date.isoformat(),
-                                        days_until,
-                                    )
-                            else:
-                                # Past date - store as fallback if it's the most recent
-                                if normalized_type in most_recent_past_dates:
-                                    if (
-                                        pickup_date
-                                        > most_recent_past_dates[normalized_type][
-                                            "next_date"
-                                        ]
-                                    ):
-                                        most_recent_past_dates[normalized_type] = {
-                                            "next_date": pickup_date,
-                                            "days_until": days_until,
-                                        }
-                                else:
-                                    most_recent_past_dates[normalized_type] = {
-                                        "next_date": pickup_date,
-                                        "days_until": days_until,
-                                    }
-                                    _LOGGER.debug(
-                                        "Found past %s waste with pickup date: %s (%d days ago)",
-                                        normalized_type,
-                                        pickup_date.isoformat(),
-                                        abs(days_until),
-                                    )
-                        except ValueError as err:
-                            _LOGGER.warning(
-                                "Invalid date format: %s - Error: %s",
-                                pickup_date_str,
-                                err,
-                            )
-                except Exception as err:
-                    _LOGGER.warning("Error processing pickup entry: %s", err)
-
-            # Fill in most recent past dates for waste types that don't have future dates
-            for waste_type, past_data in most_recent_past_dates.items():
-                if waste_type not in result:
-                    _LOGGER.info(
-                        "No future %s dates found, using most recent past date: %s (%d days ago)",
-                        waste_type,
-                        past_data["next_date"].isoformat(),
-                        abs(past_data["days_until"]),
-                    )
-                    result[waste_type] = past_data
-
-        except (KeyError, TypeError) as err:
-            _LOGGER.error("Error processing calendar data: %s", err)
-
-        return result
-
-    def _extract_pickup_type(self, pickup: dict[str, Any]) -> Optional[str]:
-        """Extract pickup type from the pickup object."""
-        # Try different field names that might contain the pickup type
-        for field in [
-            "pickupTypeText",  # common field name in API
-            "_pickupTypeText",  # sometimes present with underscore
-            "pickupType",
-            "description",
-            "wastetype",
-        ]:
-            if field in pickup and pickup[field]:
-                _LOGGER.debug(
-                    "Found pickup type in field '%s': %s", field, pickup[field]
-                )
-                return pickup[field]
-
-        _LOGGER.debug("Could not find pickup type in pickup object")
-        return None
-
-    def _extract_pickup_date(self, pickup: dict[str, Any]) -> Optional[str]:
-        """Extract pickup date from the pickup object."""
-        # Try different field names that might contain the pickup date
-        for field in ["pickupDates", "date", "pickupDate"]:
-            if field in pickup:
-                if isinstance(pickup[field], list) and pickup[field]:
-                    _LOGGER.debug(
-                        "Found pickup date in list field '%s': %s",
-                        field,
-                        pickup[field][0],
-                    )
-                    return pickup[field][0]
-                elif pickup[field]:
-                    _LOGGER.debug(
-                        "Found pickup date in field '%s': %s", field, pickup[field]
-                    )
-                    return pickup[field]
-
-        _LOGGER.debug("Could not find pickup date in pickup object")
-        return None
-
-    def _process_pickup(
-        self,
-        result: dict[str, dict],
-        pickup_type: str,
-        pickup_date_str: str,
-        waste_type_mapping: dict[str, str],
-        today: date,
-    ) -> None:
-        """Process a single pickup entry and add it to the result if valid."""
-        try:
-            # Parse the date string (format is usually 'YYYY-MM-DD')
-            if isinstance(pickup_date_str, str) and "T" in pickup_date_str:
-                pickup_date_str = pickup_date_str.split("T")[0]
-
-            pickup_date = datetime.strptime(pickup_date_str, "%Y-%m-%d").date()
-
-            # Find the normalized waste type
-            normalized_type = self._normalize_waste_type(
-                pickup_type, waste_type_mapping
+            None,
+        )
+        if address is None and candidates and not self.house_letter:
+            address = candidates[0]
+        if address is None:
+            raise RadAfvalAddressNotFoundError(
+                f"Address {self.postal_code} {self.house_number}{self.house_letter} not found"
             )
-            if not normalized_type:
-                return
+        if not address.get("UniqueId"):
+            raise RadAfvalError("FetchAdress response has no UniqueId")
 
-            # Only process future dates
-            if pickup_date >= today:
-                # Check if we already have a closer date for this waste type
-                if normalized_type in result:
-                    existing_date = result[normalized_type]["next_date"]
-                    if pickup_date < existing_date:
-                        days_until = (pickup_date - today).days
-                        result[normalized_type] = {
-                            "next_date": pickup_date,
-                            "days_until": days_until,
-                        }
-                else:
-                    days_until = (pickup_date - today).days
-                    result[normalized_type] = {
-                        "next_date": pickup_date,
-                        "days_until": days_until,
-                    }
-                    _LOGGER.debug(
-                        "Found %s waste with pickup date: %s (%d days from now)",
-                        normalized_type,
-                        pickup_date.isoformat(),
-                        days_until,
-                    )
-        except ValueError as err:
-            _LOGGER.warning("Invalid date format: %s - Error: %s", pickup_date_str, err)
+        self._address_id = str(address["UniqueId"])
+        return self._address_id
 
-    def _normalize_waste_type(
-        self, pickup_type: str, waste_type_mapping: dict[str, str]
-    ) -> Optional[str]:
-        """Normalize the waste type based on mapping."""
-        # First try exact match
-        if str(pickup_type) in waste_type_mapping:
-            return waste_type_mapping[str(pickup_type)]
+    async def async_get_pickup_dates(self, today: date) -> dict[str, list[date]]:
+        """Return the sorted pickup dates per waste type."""
+        address_id = await self.async_get_address_id()
+        try:
+            body = await self._post(
+                "GetCalendar",
+                {
+                    "companyCode": COMPANY_CODE,
+                    "uniqueAddressID": address_id,
+                    "startDate": (today - LOOKBACK).isoformat(),
+                    "endDate": date(today.year + 2, 12, 31).isoformat(),
+                    "community": COMMUNITY,
+                },
+            )
+        except RadAfvalError:
+            # Look the address up again next time in case its ID changed.
+            self._address_id = None
+            raise
+        return parse_calendar(body.get("dataList") or [])
 
-        # Try partial match
-        for key, value in waste_type_mapping.items():
-            if key.lower() in str(pickup_type).lower():
-                return value
+    async def _post(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """POST to the API and return the body if the API reports success."""
+        try:
+            async with asyncio.timeout(REQUEST_TIMEOUT):
+                async with self._session.post(
+                    f"{API_URL}{endpoint}", json=payload
+                ) as response:
+                    response.raise_for_status()
+                    body = await response.json(content_type=None)
+        except TimeoutError as err:
+            raise RadAfvalError(f"Timeout calling {endpoint}") from err
+        except (aiohttp.ClientError, ValueError) as err:
+            raise RadAfvalError(f"Error calling {endpoint}: {err}") from err
 
-        _LOGGER.debug("Unknown pickup type: %s", pickup_type)
-        return None
+        # Application errors arrive as HTTP 200 with "status": false.
+        if not isinstance(body, dict) or body.get("status") is not True:
+            code = body.get("messageCode") if isinstance(body, dict) else None
+            raise RadAfvalError(f"{endpoint} returned an error (messageCode {code})")
+        return body
+
+
+def parse_calendar(entries: list[Any]) -> dict[str, list[date]]:
+    """Map GetCalendar entries to sorted pickup dates per waste type."""
+    result: dict[str, set[date]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        code = str(entry.get("_pickupTypeText") or "").upper()
+        waste_type = PICKUP_TYPES.get(code)
+        if waste_type is None:
+            _LOGGER.debug("Ignoring unsupported pickup type %r", code)
+            continue
+        for raw in entry.get("pickupDates") or []:
+            try:
+                pickup = date.fromisoformat(str(raw)[:10])
+            except ValueError:
+                _LOGGER.warning("Ignoring invalid pickup date %r for %s", raw, code)
+                continue
+            result.setdefault(waste_type, set()).add(pickup)
+    return {waste_type: sorted(dates) for waste_type, dates in result.items()}
+
+
+def next_pickup(dates: list[date], today: date) -> date | None:
+    """Return the first pickup on or after today, else the most recent one.
+
+    The fallback covers the weeks around new year when the next calendar has
+    not been published yet.
+    """
+    return next(
+        (pickup for pickup in dates if pickup >= today), dates[-1] if dates else None
+    )
