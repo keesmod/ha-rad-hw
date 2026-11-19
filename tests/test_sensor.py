@@ -149,7 +149,7 @@ async def test_device(hass: HomeAssistant, init_integration: MockConfigEntry) ->
     assert device.identifiers == {(DOMAIN, "1234AB_1")}
     assert device.name == "RAD HW Afval 1234AB 1"
     assert device.entry_type is dr.DeviceEntryType.SERVICE
-    assert device.sw_version == "1.3.1"
+    assert device.sw_version == "1.3.2"
     assert device.manufacturer == "RAD Hoeksche Waard"
     assert device.model == "Afvalkalender"
 

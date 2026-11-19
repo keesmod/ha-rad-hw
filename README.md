@@ -278,6 +278,11 @@ Common problems:
 
 ## Changelog
 
+### 1.3.2
+
+- Clarifies the credits: since the 1.3.0 rewrite the integration contains no
+  code from Afvalbeheer. No functional changes.
+
 ### 1.3.1
 
 - Marks the integration as Netherlands-only (`country: NL` in `hacs.json`) for
@@ -314,9 +319,10 @@ For earlier versions, see the
 
 ## Credits
 
-This integration is based on the
+The Ximmio API endpoints and RAD's company code were first found in the
 [Afvalbeheer](https://github.com/pippyn/Home-Assistant-Sensor-Afvalbeheer)
-integration.
+integration (Apache-2.0), on which early versions of this integration were
+based. Version 1.3.0 is a complete rewrite and contains no code from Afvalbeheer.
 
 ## License
 
